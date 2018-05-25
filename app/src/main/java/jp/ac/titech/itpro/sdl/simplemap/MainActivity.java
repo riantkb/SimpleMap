@@ -10,6 +10,7 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,6 +26,12 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
+
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
@@ -36,6 +43,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private FusedLocationProviderClient fusedLocationProviderClient;
     private LocationRequest locationRequest;
     private LocationCallback locationCallback;
+    private LatLng latLng;
+    private ArrayList<Marker> markers;
+    private Marker lastClickedMarker;
+    private Polyline polyline;
+    private ArrayList<LatLng> markerPoints;
+    private float dist;
 
     private enum UpdatingState {STOPPED, REQUESTING, STARTED}
 
@@ -77,14 +90,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 Log.d(TAG, "onLocationResult");
                 if (locationResult != null) {
                     Location location = locationResult.getLastLocation();
-                    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+                    boolean f = latLng == null;
+                    latLng = new LatLng(location.getLatitude(), location.getLongitude());
                     infoView.setText(getString(R.string.latlng_format,
-                            latLng.latitude, latLng.longitude));
-                    if (googleMap != null)
+                            latLng.latitude, latLng.longitude, dist));
+                    if (googleMap != null && f)
                         googleMap.animateCamera(CameraUpdateFactory.newLatLng(latLng));
                 }
             }
         };
+
+        markers = new ArrayList<>();
+        markerPoints = new ArrayList<>();
+        dist = 0.0f;
     }
 
     @Override
@@ -124,6 +142,39 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "onMapReady");
         map.moveCamera(CameraUpdateFactory.zoomTo(15f));
         googleMap = map;
+        googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                markerPoints.add(latLng);
+                polyline.setPoints(markerPoints);
+                if (lastClickedMarker != null) {
+                    float[] f = new float[1];
+                    Location.distanceBetween(lastClickedMarker.getPosition().latitude, lastClickedMarker.getPosition().longitude, latLng.latitude, latLng.longitude, f);
+                    dist += f[0];
+                    infoView.setText(getString(R.string.latlng_format,
+                            latLng.latitude, latLng.longitude, dist));
+                }
+                lastClickedMarker = googleMap.addMarker(new MarkerOptions().position(latLng));
+                markers.add(lastClickedMarker);
+            }
+        });
+        googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                markerPoints.add(marker.getPosition());
+                polyline.setPoints(markerPoints);
+                if (lastClickedMarker != null) {
+                    float[] f = new float[1];
+                    Location.distanceBetween(lastClickedMarker.getPosition().latitude, lastClickedMarker.getPosition().longitude, marker.getPosition().latitude, marker.getPosition().longitude, f);
+                    dist += f[0];
+                    infoView.setText(getString(R.string.latlng_format,
+                            latLng.latitude, latLng.longitude, dist));
+                }
+                lastClickedMarker = marker;
+                return true;
+            }
+        });
+        polyline = googleMap.addPolyline(new PolylineOptions());
     }
 
     @Override
@@ -176,5 +227,23 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Log.d(TAG, "stopLocationUpdate");
         fusedLocationProviderClient.removeLocationUpdates(locationCallback);
         state = UpdatingState.STOPPED;
+    }
+
+    public void onMoveButtonClick(View v) {
+        if (googleMap != null)
+            googleMap.animateCamera(CameraUpdateFactory.newLatLng(latLng));
+    }
+    public void onResetButtonClick(View v) {
+        for (Marker m : markers) {
+            m.remove();
+        }
+        polyline.setPoints(new ArrayList<LatLng>());
+        lastClickedMarker = null;
+        markers = new ArrayList<>();
+        markerPoints = new ArrayList<>();
+        dist = 0.0f;
+        infoView.setText(getString(R.string.latlng_format,
+                latLng.latitude, latLng.longitude, dist));
+
     }
 }

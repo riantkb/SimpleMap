@@ -2,5 +2,7 @@
     <string name="app_name">SimpleMap</string>
     <string name="toast_requires_permission_format">Requires permission %s</string>
     <string name="info_view_default">SimpleMap</string>
-    <string name="latlng_format">latitude = %f, longitude = %f</string>
+    <string name="latlng_format">latitude = %f, longitude = %f\ndistance = %f m</string>
+    <string name="move_button_text">Move to Your Location</string>
+    <string name="reset_button_text">Reset All Markers</string>
 </resources>
